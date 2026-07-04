@@ -9,6 +9,7 @@ import format from './routes/format'
 import compress from './routes/compress'
 import image from './routes/image'
 import cache from './routes/cache'
+import forms from './routes/forms'
 
 export type Env = { Bindings: CloudflareBindings }
 
@@ -29,6 +30,7 @@ app.route('/', format)
 app.route('/', compress)
 app.route('/', image)
 app.route('/', cache)
+app.route('/', forms)
 
 app.get('/healthz', (c) => c.json({ ok: true }))
 
