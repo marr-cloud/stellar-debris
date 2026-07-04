@@ -2,11 +2,11 @@
 export const PNG_1x1_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 
-export function pngBytes(): Uint8Array {
+export function pngBytes(): Uint8Array<ArrayBuffer> {
   const bin = atob(PNG_1x1_BASE64)
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
-  return out
+  return out as Uint8Array<ArrayBuffer>
 }
 
 export function svgSample(): string {

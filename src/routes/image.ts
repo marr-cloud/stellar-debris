@@ -5,7 +5,7 @@ import { pngBytes, svgSample } from '../assets/images'
 const image = new Hono<Env>()
 
 const png = (c: import('hono').Context<Env>) =>
-  c.body(pngBytes() as any, 200, { 'content-type': 'image/png' })
+  c.body(pngBytes(), 200, { 'content-type': 'image/png' })
 const svg = (c: import('hono').Context<Env>) =>
   c.body(svgSample(), 200, { 'content-type': 'image/svg+xml' })
 
