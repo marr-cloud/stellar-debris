@@ -1,3 +1,9 @@
+# Which dependencies pnpm may run install/build scripts for.
+# esbuild & workerd need their native binaries. sharp (pulled in transitively by
+# miniflare, only for local image emulation) is NOT needed for `wrangler deploy`,
+# so it's explicitly denied — this keeps CI installs from failing with
+# ERR_PNPM_IGNORED_BUILDS on Cloudflare Workers Builds.
 allowBuilds:
   esbuild: true
   workerd: true
+  sharp: false
