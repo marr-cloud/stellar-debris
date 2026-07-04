@@ -6,6 +6,7 @@ import cookies from './routes/cookies'
 import auth from './routes/auth'
 import stream from './routes/stream'
 import format from './routes/format'
+import compress from './routes/compress'
 
 export type Env = { Bindings: CloudflareBindings }
 
@@ -23,6 +24,7 @@ app.route('/', cookies)
 app.route('/', auth)
 app.route('/', stream)
 app.route('/', format)
+app.route('/', compress)
 
 app.get('/healthz', (c) => c.json({ ok: true }))
 
