@@ -12,6 +12,8 @@ import cache from './routes/cache'
 import forms from './routes/forms'
 import ws from './routes/websocket'
 import curl from './routes/curl'
+import { DocsPage } from './docs/page'
+import { CATALOG, renderExample } from './docs/catalog'
 
 export type Env = { Bindings: CloudflareBindings }
 
@@ -37,5 +39,19 @@ app.route('/', ws)
 app.route('/', curl)
 
 app.get('/healthz', (c) => c.json({ ok: true }))
+
+app.get('/', (c) => {
+  const host = new URL(c.req.url).origin
+  const env = host.includes('localhost') || host.includes('127.0.0.1') ? 'dev' : 'prod'
+  return c.html(<DocsPage host={host} env={env} />)
+})
+
+app.get('/spec', (c) => {
+  const host = new URL(c.req.url).origin
+  return c.json({
+    host,
+    endpoints: CATALOG.map((e) => ({ ...e, example: renderExample(e.example, host) })),
+  })
+})
 
 export default app
