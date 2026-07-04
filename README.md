@@ -2,12 +2,14 @@
 
 An **httpbin-compatible** HTTP request/response testing service **plus a [`static-curl`](https://github.com/stunnel/static-curl) feature playground**, built on **Cloudflare Workers** (Hono + TypeScript).
 
-Hit it from your terminal with `curl` to inspect exactly what your client sends, exercise HTTP features (redirects, auth, cookies, ranges, compression, streaming), and — once deployed — see the **real TLS version, cipher and HTTP protocol** your `curl` negotiated with Cloudflare's edge.
+Hit it from your terminal with `curl` to inspect exactly what your client sends, exercise HTTP features (redirects, auth, cookies, ranges, compression, streaming), and see the **real TLS version, cipher and HTTP protocol** your `curl` negotiated with Cloudflare's edge.
+
+**Live:** https://curl.infraforge.cc · docs at [`/`](https://curl.infraforge.cc/) · JSON catalog at [`/spec`](https://curl.infraforge.cc/spec)
 
 ```bash
-curl https://<your-worker>.workers.dev/get?hello=world
-curl --http3 https://<your-worker>.workers.dev/version   # what protocol did curl negotiate?
-curl --tlsv1.3 https://<your-worker>.workers.dev/tls      # real TLS version + cipher
+curl https://curl.infraforge.cc/get?hello=world
+curl --http3 https://curl.infraforge.cc/version   # what protocol did curl negotiate?
+curl --tlsv1.3 https://curl.infraforge.cc/tls      # real TLS version + cipher
 ```
 
 ---
@@ -19,7 +21,7 @@ pnpm install
 pnpm dev          # http://localhost:8787  — open / for the docs
 pnpm test         # vitest (49 tests)
 pnpm typecheck    # tsc --noEmit
-pnpm deploy       # publish to your *.workers.dev
+pnpm deploy       # publish to Cloudflare (custom domain curl.infraforge.cc)
 ```
 
 - **`/`** — HTML docs (Cloudflare-styled) listing every endpoint with a copy-paste `curl` example whose host auto-fills from the URL you're viewing.
@@ -68,7 +70,7 @@ Reflection endpoints return the httpbin shape: `{ args, headers, origin, url }`,
 | `--tlsv1.3`, `--ciphers` | `/tls` → reflects `tlsVersion` + `tlsCipher` |
 
 ```bash
-BASE=https://<your-worker>.workers.dev
+BASE=https://curl.infraforge.cc
 curl -r 0-99 "$BASE/range/1024" -o part.bin      # 100-byte partial (206)
 curl --compressed "$BASE/gzip"                    # transparently decompressed JSON
 curl --http3 "$BASE/version"                      # {"http_protocol":"HTTP/3", ...}
@@ -80,10 +82,16 @@ curl --digest -u user:pass "$BASE/digest-auth/auth/user/pass"
 ## Deploy
 
 ```bash
-pnpm deploy                       # → https://stellar-debris.<subdomain>.workers.dev
+pnpm deploy        # wrangler deploy --minify
 ```
 
-Custom domain: add a route/`custom_domain` to `wrangler.jsonc` (the zone must be on your Cloudflare account) and redeploy.
+Served on the custom domain **`curl.infraforge.cc`**, configured in `wrangler.jsonc`:
+
+```jsonc
+"routes": [{ "pattern": "curl.infraforge.cc", "custom_domain": true }]
+```
+
+Cloudflare provisions the DNS record and edge certificate automatically (the zone must be on your Cloudflare account). To also keep the `*.workers.dev` URL, add `"workers_dev": true`.
 
 ---
 
@@ -91,7 +99,7 @@ Custom domain: add a route/`custom_domain` to `wrangler.jsonc` (the zone must be
 
 - **`request.cf` data (`/cf`, `/tls`, `/version`) is real only when deployed.** Under `wrangler dev` the values are mocked and `httpProtocol` is `HTTP/1.1`. Deployed, `curl --tlsv1.3 …/tls` returns the genuine `{tls_version, cipher}` and `curl --http3 …/version` the negotiated protocol. (Your `curl` build must actually support the flag — some Windows/Schannel builds lack `--http2`/`--http3`; static-curl includes them.)
 - **`/gzip` & `/deflate` set `Content-Encoding` via `encodeBody: 'manual'`** so the Cloudflare edge preserves the header instead of stripping/re-encoding it; `curl --compressed` decompresses correctly in both `wrangler dev` and production. (Verified against the deployed Worker.)
-- **brotli / zstd:** the Workers runtime's `CompressionStream` only produces gzip/deflate, so those two are implemented natively. `/compression` reflects the `Accept-Encoding` your `curl` sent and the `Content-Encoding` the Cloudflare edge negotiates (the edge supports br/zstd in production).
+- **brotli / zstd:** the Workers runtime's `CompressionStream` only produces gzip/deflate, so those two are implemented natively. The Cloudflare edge additionally compresses regular JSON responses with **br/zstd** when your `Accept-Encoding` asks for it — so `curl -H 'Accept-Encoding: zstd' …/get` returns zstd bytes (add `--compressed` to decompress). `/compression` explains this and is itself served **uncompressed** (via `encodeBody: 'manual'` + `no-transform`) so it always prints as text.
 - **`/websocket/echo`:** the WS upgrade works when deployed or under `wrangler dev --remote`; a plain `curl` on it returns `426`.
 - **Images:** `/image/png` (a 1×1 PNG) and `/image/svg` (generated) cover `Accept`-negotiation testing; jpeg/webp are not generated in-runtime.
 - **digest-auth** advertises `algorithm=SHA-256` (Workers `crypto.subtle` has no MD5); `curl --digest` negotiates it automatically.
