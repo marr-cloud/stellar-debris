@@ -11,6 +11,7 @@ import image from './routes/image'
 import cache from './routes/cache'
 import forms from './routes/forms'
 import ws from './routes/websocket'
+import curl from './routes/curl'
 
 export type Env = { Bindings: CloudflareBindings }
 
@@ -33,6 +34,7 @@ app.route('/', image)
 app.route('/', cache)
 app.route('/', forms)
 app.route('/', ws)
+app.route('/', curl)
 
 app.get('/healthz', (c) => c.json({ ok: true }))
 
