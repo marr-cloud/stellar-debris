@@ -1,21 +1,103 @@
 # stellar-debris
 
-An httpbin-compatible HTTP testing service + a `static-curl` feature playground, built on Cloudflare Workers (Hono).
+An **httpbin-compatible** HTTP request/response testing service **plus a [`static-curl`](https://github.com/stunnel/static-curl) feature playground**, built on **Cloudflare Workers** (Hono + TypeScript).
 
-## Develop
+Hit it from your terminal with `curl` to inspect exactly what your client sends, exercise HTTP features (redirects, auth, cookies, ranges, compression, streaming), and — once deployed — see the **real TLS version, cipher and HTTP protocol** your `curl` negotiated with Cloudflare's edge.
 
-```txt
-pnpm install
-pnpm dev        # http://localhost:8787  — docs at /
-pnpm test       # vitest
-pnpm typecheck  # tsc --noEmit
+```bash
+curl https://<your-worker>.workers.dev/get?hello=world
+curl --http3 https://<your-worker>.workers.dev/version   # what protocol did curl negotiate?
+curl --tlsv1.3 https://<your-worker>.workers.dev/tls      # real TLS version + cipher
 ```
+
+---
+
+## Quick start
+
+```bash
+pnpm install
+pnpm dev          # http://localhost:8787  — open / for the docs
+pnpm test         # vitest (49 tests)
+pnpm typecheck    # tsc --noEmit
+pnpm deploy       # publish to your *.workers.dev
+```
+
+- **`/`** — HTML docs (Cloudflare-styled) listing every endpoint with a copy-paste `curl` example whose host auto-fills from the URL you're viewing.
+- **`/spec`** — the same catalog as JSON.
+
+---
+
+## Endpoint catalog
+
+| Category | Endpoints |
+|---|---|
+| **Reflection** | `/get` `/post` `/put` `/patch` `/delete` `/anything(/*)` `/headers` `/ip` `/user-agent` |
+| **Status** | `/status/:codes` (single, comma-list = random; `401`/`407` add auth headers) |
+| **Redirect** | `/redirect/:n` `/redirect-to?url=&status_code=` `/relative-redirect/:n` `/absolute-redirect/:n` |
+| **Cookies** | `/cookies` `/cookies/set?k=v` `/cookies/set/:name/:value` `/cookies/delete?k=` |
+| **Auth** | `/basic-auth/:u/:p` `/hidden-basic-auth/:u/:p` `/bearer` `/digest-auth/:qop/:u/:p` (SHA-256) |
+| **Streaming / time** | `/delay/:n` `/drip?duration=&numbytes=&code=` `/stream/:n` `/stream-bytes/:n` `/bytes/:n` `/range/:n` (206 + `Content-Range`) |
+| **Format** | `/json` `/html` `/xml` `/uuid` `/base64/:val` `/encoding/utf8` `/robots.txt` `/deny` |
+| **Compression** | `/gzip` `/deflate` (real `Content-Encoding`) |
+| **Images** | `/image` (Accept-negotiated) `/image/png` `/image/svg` |
+| **Cache** | `/cache` (304 on conditional GET) `/cache/:n` (max-age) `/etag/:etag` `/response-headers?k=v` |
+| **Forms** | `/forms/post` |
+| **WebSocket** | `/websocket/echo` |
+| **curl / Cloudflare** | `/cf` `/tls` `/version` `/compression` |
+| **Meta** | `/` (docs) `/spec` (JSON) `/healthz` |
+
+Reflection endpoints return the httpbin shape: `{ args, headers, origin, url }`, plus `{ data, form, files, json }` for bodies, plus `method` on `/anything`.
+
+---
+
+## Testing `static-curl` features
+
+`static-curl` is `curl` compiled statically with HTTP/2, HTTP/3, TLS 1.3, brotli, zstd, etc. Map its flags to endpoints:
+
+| curl / static-curl flag | Endpoint that exercises it |
+|---|---|
+| `-X` method, `-H` header, `-d` / `-F` data | `/anything`, `/post`, `/headers` |
+| `--retry`, `-w '%{http_code}'` | `/status/500`, `/status/200,500` |
+| `-L` follow redirects, `--max-redirs` | `/redirect/3`, `/redirect-to` |
+| `-u` basic, `--digest`, `--oauth2-bearer` | `/basic-auth`, `/digest-auth`, `/bearer` |
+| `-b` / `-c` cookies | `/cookies/set`, `/cookies` |
+| `-r` / `--range` | `/range/1024` → `206 Partial Content` |
+| `--max-time`, `--limit-rate` | `/delay/3`, `/drip` |
+| `--compressed` | `/gzip`, `/deflate` |
+| `--http2` / `--http3` | `/version` → reflects `httpProtocol` |
+| `--tlsv1.3`, `--ciphers` | `/tls` → reflects `tlsVersion` + `tlsCipher` |
+
+```bash
+BASE=https://<your-worker>.workers.dev
+curl -r 0-99 "$BASE/range/1024" -o part.bin      # 100-byte partial (206)
+curl --compressed "$BASE/gzip"                    # transparently decompressed JSON
+curl --http3 "$BASE/version"                      # {"http_protocol":"HTTP/3", ...}
+curl --digest -u user:pass "$BASE/digest-auth/auth/user/pass"
+```
+
+---
 
 ## Deploy
 
-```txt
-pnpm deploy
+```bash
+pnpm deploy                       # → https://stellar-debris.<subdomain>.workers.dev
 ```
 
-Open `/` for the endpoint catalog with copy-paste `curl` examples, or `GET /spec` for JSON.
-`request.cf`-backed endpoints (`/cf`, `/tls`, `/version`) show real TLS/HTTP data only once deployed.
+Custom domain: add a route/`custom_domain` to `wrangler.jsonc` (the zone must be on your Cloudflare account) and redeploy.
+
+---
+
+## Notes & platform limits (honest)
+
+- **`request.cf` data (`/cf`, `/tls`, `/version`) is real only when deployed.** Under `wrangler dev` the values are mocked and `httpProtocol` is `HTTP/1.1`. Deploy and `curl --http3` / `--tlsv1.3` to see genuine negotiation.
+- **`/gzip` & `/deflate` under `wrangler dev`:** the local dev proxy re-compresses the already-`Content-Encoding`-tagged body, so `curl --compressed` sees double-gzip **locally only**. The Worker's own output is valid single-gzip (proven by `tests/compress.test.ts`) and works correctly **in production**, where Cloudflare's edge respects a Worker-set `Content-Encoding`.
+- **brotli / zstd:** the Workers runtime's `CompressionStream` only produces gzip/deflate, so those two are implemented natively. `/compression` reflects the `Accept-Encoding` your `curl` sent and the `Content-Encoding` the Cloudflare edge negotiates (the edge supports br/zstd in production).
+- **`/websocket/echo`:** the WS upgrade works when deployed or under `wrangler dev --remote`; a plain `curl` on it returns `426`.
+- **Images:** `/image/png` (a 1×1 PNG) and `/image/svg` (generated) cover `Accept`-negotiation testing; jpeg/webp are not generated in-runtime.
+- **digest-auth** advertises `algorithm=SHA-256` (Workers `crypto.subtle` has no MD5); `curl --digest` negotiates it automatically.
+
+---
+
+## Stack
+
+Cloudflare Workers · [Hono](https://hono.dev) 4 · TypeScript · `hono/jsx` for the docs page · Vitest (via Hono `app.request()`) · Wrangler · pnpm. Only runtime dependency: `hono`.

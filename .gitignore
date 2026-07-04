@@ -34,3 +34,6 @@ lerna-debug.log*
 
 # SDD scratch (subagent-driven-development)
 .superpowers/
+
+# local agent config
+.claude/
