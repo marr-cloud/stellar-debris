@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import reflect from './routes/reflect'
+import status from './routes/status'
 
 export type Env = { Bindings: CloudflareBindings }
 
@@ -11,6 +12,7 @@ app.onError((err, c) => {
 })
 
 app.route('/', reflect)
+app.route('/', status)
 
 app.get('/healthz', (c) => c.json({ ok: true }))
 
