@@ -89,8 +89,8 @@ Custom domain: add a route/`custom_domain` to `wrangler.jsonc` (the zone must be
 
 ## Notes & platform limits (honest)
 
-- **`request.cf` data (`/cf`, `/tls`, `/version`) is real only when deployed.** Under `wrangler dev` the values are mocked and `httpProtocol` is `HTTP/1.1`. Deploy and `curl --http3` / `--tlsv1.3` to see genuine negotiation.
-- **`/gzip` & `/deflate` under `wrangler dev`:** the local dev proxy re-compresses the already-`Content-Encoding`-tagged body, so `curl --compressed` sees double-gzip **locally only**. The Worker's own output is valid single-gzip (proven by `tests/compress.test.ts`) and works correctly **in production**, where Cloudflare's edge respects a Worker-set `Content-Encoding`.
+- **`request.cf` data (`/cf`, `/tls`, `/version`) is real only when deployed.** Under `wrangler dev` the values are mocked and `httpProtocol` is `HTTP/1.1`. Deployed, `curl --tlsv1.3 …/tls` returns the genuine `{tls_version, cipher}` and `curl --http3 …/version` the negotiated protocol. (Your `curl` build must actually support the flag — some Windows/Schannel builds lack `--http2`/`--http3`; static-curl includes them.)
+- **`/gzip` & `/deflate` set `Content-Encoding` via `encodeBody: 'manual'`** so the Cloudflare edge preserves the header instead of stripping/re-encoding it; `curl --compressed` decompresses correctly in both `wrangler dev` and production. (Verified against the deployed Worker.)
 - **brotli / zstd:** the Workers runtime's `CompressionStream` only produces gzip/deflate, so those two are implemented natively. `/compression` reflects the `Accept-Encoding` your `curl` sent and the `Content-Encoding` the Cloudflare edge negotiates (the edge supports br/zstd in production).
 - **`/websocket/echo`:** the WS upgrade works when deployed or under `wrangler dev --remote`; a plain `curl` on it returns `426`.
 - **Images:** `/image/png` (a 1×1 PNG) and `/image/svg` (generated) cover `Accept`-negotiation testing; jpeg/webp are not generated in-runtime.
