@@ -1349,7 +1349,7 @@ ws.get('/websocket/echo', (c) => {
   const server = pair[1]
   server.accept()
   server.addEventListener('message', (event) => {
-    server.send(typeof event.data === 'string' ? event.data : event.data)
+    server.send(event.data)
   })
   server.addEventListener('close', () => server.close())
   return new Response(null, { status: 101, webSocket: client })
