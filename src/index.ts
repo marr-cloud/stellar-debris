@@ -4,6 +4,7 @@ import status from './routes/status'
 import redirect from './routes/redirect'
 import cookies from './routes/cookies'
 import auth from './routes/auth'
+import stream from './routes/stream'
 
 export type Env = { Bindings: CloudflareBindings }
 
@@ -19,6 +20,7 @@ app.route('/', status)
 app.route('/', redirect)
 app.route('/', cookies)
 app.route('/', auth)
+app.route('/', stream)
 
 app.get('/healthz', (c) => c.json({ ok: true }))
 
