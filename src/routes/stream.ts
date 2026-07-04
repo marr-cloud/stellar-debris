@@ -84,7 +84,12 @@ stream.get('/stream-bytes/:n', (c) => {
 stream.get('/drip', async (c) => {
   const duration = clamp(Number.parseFloat(c.req.query('duration') ?? '2'), 0, 10)
   const numbytes = clamp(Number.parseInt(c.req.query('numbytes') ?? '10', 10), 1, 10240)
-  const code = Number.parseInt(c.req.query('code') ?? '200', 10)
+  const requestedCode = Number.parseInt(c.req.query('code') ?? '200', 10)
+  const NULL_BODY_CODES = new Set([204, 205, 304])
+  const code =
+    requestedCode >= 200 && requestedCode <= 599 && !NULL_BODY_CODES.has(requestedCode)
+      ? requestedCode
+      : 200
   const delay = (duration * 1000) / numbytes
   const rs = new ReadableStream({
     async start(controller) {
@@ -95,7 +100,7 @@ stream.get('/drip', async (c) => {
       controller.close()
     },
   })
-  return c.body(rs, (code >= 100 && code <= 599 ? code : 200) as any, {
+  return c.body(rs, code as any, {
     'content-type': 'application/octet-stream',
   })
 })

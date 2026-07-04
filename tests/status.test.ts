@@ -15,4 +15,18 @@ describe('status', () => {
     const res = await app.request('/status/200,201')
     expect([200, 201]).toContain(res.status)
   })
+  it('/status/204 returns 204 with an empty body', async () => {
+    const res = await app.request('/status/204')
+    expect(res.status).toBe(204)
+    const text = await res.text()
+    expect(text).toBe('')
+  })
+  it('/status/304 returns 304', async () => {
+    const res = await app.request('/status/304')
+    expect(res.status).toBe(304)
+  })
+  it('/status/100 falls back to 400 (1xx not representable)', async () => {
+    const res = await app.request('/status/100')
+    expect(res.status).toBe(400)
+  })
 })

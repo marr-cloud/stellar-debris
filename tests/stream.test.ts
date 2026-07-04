@@ -28,4 +28,10 @@ describe('stream/time', () => {
     expect(lines.length).toBe(3)
     expect(JSON.parse(lines[0]).id).toBe(0)
   })
+  it('/drip?code=204 falls back to 200 and streams the requested bytes', async () => {
+    const res = await app.request('/drip?code=204&duration=0&numbytes=2')
+    expect(res.status).toBe(200)
+    const buf = new Uint8Array(await res.arrayBuffer())
+    expect(buf.length).toBe(2)
+  })
 })
