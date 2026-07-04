@@ -3,6 +3,9 @@
   "name": "stellar-debris",
   "main": "src/index.tsx",
   "compatibility_date": "2026-07-03",
+  "routes": [
+    { "pattern": "curl.infraforge.cc", "custom_domain": true }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
